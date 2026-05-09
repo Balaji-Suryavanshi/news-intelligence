@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NewsIQ — AI News Intelligence</title>
+<style>
+  /* ── Reset & base ─────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:        #0f1117;
+    --surface:   #1a1d27;
+    --surface2:  #232639;
+    --border:    #2e3348;
+    --accent:    #6c63ff;
+    --accent2:   #a78bfa;
+    --text:      #e2e8f0;
+    --muted:     #94a3b8;
+    --pos:       #22c55e;
+    --neg:       #ef4444;
+    --neu:       #64748b;
+    --radius:    12px;
+    --shadow:    0 4px 24px rgba(0,0,0,.4);
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+  a { color: var(--accent2); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ── Layout ───────────────────────────────────────────────────── */
+  .header {
+    background: linear-gradient(135deg, #1a1d27 0%, #0f1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex; align-items: center; gap: 16px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { font-size: 1.5rem; font-weight: 800; background: linear-gradient(90deg,#6c63ff,#a78bfa); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .header-right { margin-left: auto; display: flex; gap: 12px; align-items: center; }
+  .pipeline-btn {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 8px 18px; font-size: .85rem; cursor: pointer; font-weight: 600;
+    transition: opacity .2s;
+  }
+  .pipeline-btn:hover { opacity: .85; }
+  .pipeline-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  .main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
+
+  /* ── Stats bar ────────────────────────────────────────────────── */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 32px; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px 22px;
+  }
+  .stat-label { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+  .stat-value { font-size: 2rem; font-weight: 700; margin-top: 4px; }
+  .stat-value.pos { color: var(--pos); }
+  .stat-value.neg { color: var(--neg); }
+  .stat-value.neu { color: var(--neu); }
+  .stat-value.acc { color: var(--accent2); }
+
+  /* ── Filters ──────────────────────────────────────────────────── */
+  .filters {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px 22px; display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; align-items: center;
+  }
+  .search-wrap { position: relative; flex: 1 1 240px; }
+  .search-wrap input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 14px 10px 38px; color: var(--text); font-size: .9rem; outline: none;
+    transition: border-color .2s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 1rem; }
+  select {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 14px; color: var(--text); font-size: .85rem; cursor: pointer; outline: none;
+  }
+  select:focus { border-color: var(--accent); }
+  .filter-label { font-size: .8rem; color: var(--muted); }
+
+  /* ── Articles grid ────────────────────────────────────────────── */
+  .articles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 20px; }
+
+  .article-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; transition: transform .2s, border-color .2s; display: flex; flex-direction: column;
+  }
+  .article-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+
+  .card-img { width: 100%; height: 180px; object-fit: cover; background: var(--surface2); }
+  .card-img-placeholder { width: 100%; height: 180px; background: linear-gradient(135deg,#1e2130,#2a2d45); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: var(--border); }
+
+  .card-body { padding: 18px 20px; flex: 1; display: flex; flex-direction: column; gap: 10px; }
+
+  .card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .badge {
+    font-size: .68rem; font-weight: 700; padding: 3px 9px; border-radius: 99px;
+    text-transform: uppercase; letter-spacing: .06em;
+  }
+  .badge-pos { background: rgba(34,197,94,.15); color: var(--pos); }
+  .badge-neg { background: rgba(239,68,68,.15); color: var(--neg); }
+  .badge-neu { background: rgba(100,116,139,.15); color: var(--neu); }
+  .badge-cat { background: rgba(108,99,255,.15); color: var(--accent2); }
+  .card-source { font-size: .75rem; color: var(--muted); }
+  .card-date   { font-size: .75rem; color: var(--muted); margin-left: auto; }
+
+  .card-title { font-size: 1rem; font-weight: 700; line-height: 1.4; color: var(--text); }
+
+  .card-summary {
+    font-size: .85rem; color: var(--muted); line-height: 1.6;
+    background: var(--surface2); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0;
+    padding: 10px 12px;
+  }
+
+  .insights-toggle {
+    font-size: .8rem; color: var(--accent2); cursor: pointer; user-select: none;
+    display: flex; align-items: center; gap: 6px; background: none; border: none;
+  }
+  .insights-toggle .arrow { transition: transform .2s; display: inline-block; }
+  .insights-toggle.open .arrow { transform: rotate(90deg); }
+
+  .insights-list { display: none; flex-direction: column; gap: 6px; margin-top: 4px; }
+  .insights-list.open { display: flex; }
+  .insight-item {
+    font-size: .82rem; color: var(--text); padding: 8px 12px;
+    background: var(--surface2); border-radius: 6px; border: 1px solid var(--border);
+    display: flex; gap: 8px;
+  }
+  .insight-item::before { content: "→"; color: var(--accent); flex-shrink: 0; }
+
+  .card-footer { display: flex; justify-content: flex-end; padding-top: 4px; margin-top: auto; }
+  .read-more { font-size: .8rem; }
+
+  /* ── Sentiment bar ────────────────────────────────────────────── */
+  .sentiment-bar { height: 4px; border-radius: 2px; margin-bottom: 2px; }
+
+  /* ── Pagination ───────────────────────────────────────────────── */
+  .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 36px; flex-wrap: wrap; }
+  .page-btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 8px 14px; cursor: pointer; font-size: .85rem;
+    transition: all .2s;
+  }
+  .page-btn:hover, .page-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .page-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ── Toast ───────────────────────────────────────────────────── */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px;
+    font-size: .875rem; box-shadow: var(--shadow); z-index: 9999;
+    animation: slideUp .3s ease; max-width: 340px;
+  }
+  @keyframes slideUp { from { transform: translateY(20px); opacity:0 } to { transform: none; opacity:1 } }
+
+  /* ── Empty / loading states ───────────────────────────────────── */
+  .empty-state { text-align: center; padding: 64px 24px; color: var(--muted); }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 16px; }
+  .spinner { border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; width: 32px; height: 32px; animation: spin .8s linear infinite; margin: 40px auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Pipeline modal ───────────────────────────────────────────── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 200; display: flex; align-items: center; justify-content: center; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; width: 400px; max-width: 95vw; box-shadow: var(--shadow); }
+  .modal h2 { font-size: 1.2rem; margin-bottom: 20px; }
+  .modal label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: 6px; }
+  .modal input, .modal select {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 14px; color: var(--text); font-size: .9rem; margin-bottom: 16px; outline: none;
+  }
+  .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+  .btn-secondary { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 9px 18px; cursor: pointer; }
+  .btn-primary { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 9px 18px; cursor: pointer; font-weight: 600; }
+
+  /* ── Responsive ───────────────────────────────────────────────── */
+  @media (max-width: 600px) {
+    .header { padding: 14px 16px; }
+    .main { padding: 20px 12px; }
+    .articles-grid { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo">⚡ NewsIQ</div>
+  <span style="color:var(--muted);font-size:.85rem">AI News Intelligence</span>
+  <div class="header-right">
+    <span id="pipeline-status-label" style="font-size:.8rem;color:var(--muted)"></span>
+    <button class="pipeline-btn" onclick="openModal()">▶ Run Pipeline</button>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- Stats -->
+  <div class="stats-grid" id="stats-grid">
+    <div class="stat-card"><div class="stat-label">Total Articles</div><div class="stat-value acc" id="stat-total">—</div></div>
+    <div class="stat-card"><div class="stat-label">AI Processed</div><div class="stat-value acc" id="stat-processed">—</div></div>
+    <div class="stat-card"><div class="stat-label">Positive</div><div class="stat-value pos" id="stat-pos">—</div></div>
+    <div class="stat-card"><div class="stat-label">Negative</div><div class="stat-value neg" id="stat-neg">—</div></div>
+    <div class="stat-card"><div class="stat-label">Neutral</div><div class="stat-value neu" id="stat-neu">—</div></div>
+    <div class="stat-card"><div class="stat-label">Sources</div><div class="stat-value acc" id="stat-sources">—</div></div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search-input" placeholder="Search articles…" oninput="debounceSearch()"/>
+    </div>
+    <div>
+      <div class="filter-label">Sentiment</div>
+      <select id="filter-sentiment" onchange="loadArticles(1)">
+        <option value="">All</option>
+        <option value="positive">Positive</option>
+        <option value="negative">Negative</option>
+        <option value="neutral">Neutral</option>
+      </select>
+    </div>
+    <div>
+      <div class="filter-label">Sort by</div>
+      <select id="sort-by" onchange="loadArticles(1)">
+        <option value="published_at">Newest first</option>
+        <option value="sentiment_score">Sentiment score</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Article grid -->
+  <div id="articles-container"></div>
+
+  <!-- Pagination -->
+  <div class="pagination" id="pagination"></div>
+</main>
+
+<!-- PIPELINE MODAL -->
+<div class="modal-overlay" id="modal" style="display:none" onclick="e=>e.target===this&&closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h2>🔄 Run Data Pipeline</h2>
+    <label>Search Query</label>
+    <input type="text" id="pipeline-query" value="technology" placeholder="e.g. AI, climate, finance"/>
+    <label>Max Pages (10 articles/page)</label>
+    <select id="pipeline-pages">
+      <option value="5">5 pages (~50 articles)</option>
+      <option value="10" selected>10 pages (~100 articles)</option>
+      <option value="20">20 pages (~200 articles)</option>
+      <option value="50">50 pages (~500 articles)</option>
+    </select>
+    <p style="font-size:.8rem;color:var(--muted);margin-bottom:16px">Pipeline fetches real news, cleans data, then processes each article with Claude AI for summary, sentiment & insights.</p>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="startPipeline()">▶ Start Pipeline</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';  // Same origin; change to http://localhost:8000 if running separately
+let currentPage = 1;
+let searchTimer = null;
+let pollTimer   = null;
+
+// ── Utilities ──────────────────────────────────────────────────────────────
+
+function $(id) { return document.getElementById(id); }
+
+function showToast(msg, duration = 3500) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), duration);
+}
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function sentimentBadge(s) {
+  const cls = s === 'positive' ? 'pos' : s === 'negative' ? 'neg' : 'neu';
+  const emoji = s === 'positive' ? '😊' : s === 'negative' ? '😟' : '😐';
+  return `<span class="badge badge-${cls}">${emoji} ${s || 'neutral'}</span>`;
+}
+
+function sentimentBarColor(score) {
+  if (!score && score !== 0) return 'var(--border)';
+  if (score > 0.2) return `hsl(${120 * Math.min(score, 1)}, 70%, 45%)`;
+  if (score < -0.2) return `hsl(0, 70%, ${45 + score * -30}%)`;
+  return 'var(--neu)';
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+
+async function loadStats() {
+  try {
+    const r = await fetch(`${API}/api/stats`);
+    const d = await r.json();
+    $('stat-total').textContent     = d.total_articles.toLocaleString();
+    $('stat-processed').textContent = d.processed_count.toLocaleString();
+    $('stat-pos').textContent       = d.positive_count.toLocaleString();
+    $('stat-neg').textContent       = d.negative_count.toLocaleString();
+    $('stat-neu').textContent       = d.neutral_count.toLocaleString();
+    $('stat-sources').textContent   = d.sources_count.toLocaleString();
+  } catch(e) { console.error('Stats error', e); }
+}
+
+// ── Articles ───────────────────────────────────────────────────────────────
+
+async function loadArticles(page = 1) {
+  currentPage = page;
+  const container = $('articles-container');
+  container.innerHTML = '<div class="spinner"></div>';
+
+  const search    = $('search-input').value.trim();
+  const sentiment = $('filter-sentiment').value;
+  const sortBy    = $('sort-by').value;
+
+  const params = new URLSearchParams({ page, limit: 12, sort_by: sortBy });
+  if (search)    params.append('search', search);
+  if (sentiment) params.append('sentiment', sentiment);
+
+  try {
+    const r = await fetch(`${API}/api/articles?${params}`);
+    const d = await r.json();
+    renderArticles(d.articles, container);
+    renderPagination(d.page, d.pages);
+  } catch(e) {
+    container.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><p>Could not load articles. Is the backend running?</p></div>`;
+  }
+}
+
+function renderArticles(articles, container) {
+  if (!articles.length) {
+    container.innerHTML = `<div class="empty-state"><div class="icon">📰</div><p>No articles found. Try running the pipeline first.</p></div>`;
+    return;
+  }
+
+  container.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'articles-grid';
+
+  articles.forEach(a => {
+    const card = document.createElement('div');
+    card.className = 'article-card';
+
+    const sentScore = typeof a.sentiment_score === 'number' ? a.sentiment_score : 0;
+    const barW = Math.abs(sentScore) * 100;
+    const barColor = sentimentBarColor(sentScore);
+
+    const imgSection = a.image_url
+      ? `<img class="card-img" src="${a.image_url}" alt="${a.title}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+        + `<div class="card-img-placeholder" style="display:none">📰</div>`
+      : `<div class="card-img-placeholder">📰</div>`;
+
+    const categoryBadge = a.category ? `<span class="badge badge-cat">${a.category}</span>` : '';
+
+    const summarySection = a.summary
+      ? `<div class="card-summary">🤖 ${a.summary}</div>` : '';
+
+    const insights = a.key_insights || [];
+    // insights shown on detail click; we'll just show toggle if summary present
+
+    card.innerHTML = `
+      ${imgSection}
+      <div class="card-body">
+        <div class="card-meta">
+          ${sentimentBadge(a.sentiment)}
+          ${categoryBadge}
+          <span class="card-source">${a.source_name || 'Unknown'}</span>
+          <span class="card-date">${fmtDate(a.published_at)}</span>
+        </div>
+        <div style="height:4px;border-radius:2px;background:var(--border);overflow:hidden">
+          <div style="height:100%;width:${barW}%;background:${barColor};border-radius:2px;transition:width .5s"></div>
+        </div>
+        <div class="card-title">${a.title}</div>
+        ${summarySection}
+        <button class="insights-toggle" onclick="toggleInsights(this, '${a.article_id}')">
+          <span class="arrow">▶</span> View Key Insights
+        </button>
+        <div class="insights-list" id="insights-${a.article_id}"></div>
+        <div class="card-footer">
+          <a class="read-more" href="${a.url}" target="_blank" rel="noopener">Read full article →</a>
+        </div>
+      </div>`;
+
+    grid.appendChild(card);
+  });
+
+  container.appendChild(grid);
+}
+
+async function toggleInsights(btn, articleId) {
+  const list = $(`insights-${articleId}`);
+  const isOpen = list.classList.contains('open');
+
+  list.classList.toggle('open', !isOpen);
+  btn.classList.toggle('open', !isOpen);
+  btn.querySelector('span:first-child').textContent = !isOpen ? '▼' : '▶';
+
+  if (!isOpen && list.children.length === 0) {
+    // Lazy-load full article insights
+    list.innerHTML = '<div style="font-size:.8rem;color:var(--muted);padding:6px">Loading…</div>';
+    try {
+      const r = await fetch(`${API}/api/articles/${articleId}`);
+      const d = await r.json();
+      const insights = d.key_insights || [];
+      if (insights.length) {
+        list.innerHTML = insights.map(i => `<div class="insight-item">${i}</div>`).join('');
+      } else {
+        list.innerHTML = '<div class="insight-item">No insights available for this article.</div>';
+      }
+    } catch(e) {
+      list.innerHTML = '<div class="insight-item">Failed to load insights.</div>';
+    }
+  }
+}
+
+// ── Pagination ─────────────────────────────────────────────────────────────
+
+function renderPagination(current, total) {
+  const container = $('pagination');
+  container.innerHTML = '';
+  if (total <= 1) return;
+
+  const mkBtn = (label, page, disabled, active) => {
+    const b = document.createElement('button');
+    b.className = 'page-btn' + (active ? ' active' : '');
+    b.textContent = label;
+    b.disabled = disabled;
+    b.onclick = () => { loadArticles(page); window.scrollTo({top: 0, behavior:'smooth'}); };
+    return b;
+  };
+
+  container.appendChild(mkBtn('‹ Prev', current - 1, current === 1, false));
+
+  const pages = [];
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (current > 3) pages.push('…');
+    for (let i = Math.max(2, current-1); i <= Math.min(total-1, current+1); i++) pages.push(i);
+    if (current < total - 2) pages.push('…');
+    pages.push(total);
+  }
+
+  pages.forEach(p => {
+    if (p === '…') {
+      const s = document.createElement('span');
+      s.textContent = '…'; s.style.padding = '8px 4px'; s.style.color = 'var(--muted)';
+      container.appendChild(s);
+    } else {
+      container.appendChild(mkBtn(p, p, false, p === current));
+    }
+  });
+
+  container.appendChild(mkBtn('Next ›', current + 1, current === total, false));
+}
+
+// ── Search debounce ────────────────────────────────────────────────────────
+
+function debounceSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => loadArticles(1), 400);
+}
+
+// ── Pipeline modal ─────────────────────────────────────────────────────────
+
+function openModal() { $('modal').style.display = 'flex'; }
+function closeModal() { $('modal').style.display = 'none'; }
+
+async function startPipeline() {
+  const query    = $('pipeline-query').value.trim() || 'technology';
+  const maxPages = parseInt($('pipeline-pages').value, 10);
+
+  closeModal();
+  showToast('🚀 Pipeline started! Processing will take a few minutes…', 4000);
+  document.querySelector('.pipeline-btn').disabled = true;
+  $('pipeline-status-label').textContent = '⏳ Running…';
+
+  await fetch(`${API}/api/pipeline/run`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ query, max_pages: maxPages }),
+  });
+
+  pollPipelineStatus();
+}
+
+function pollPipelineStatus() {
+  clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    const r = await fetch(`${API}/api/pipeline/status`);
+    const d = await r.json();
+
+    if (!d.running) {
+      clearInterval(pollTimer);
+      document.querySelector('.pipeline-btn').disabled = false;
+      $('pipeline-status-label').textContent = '';
+
+      if (d.last_result && !d.last_result.error) {
+        showToast(`✅ Pipeline done! Saved ${d.last_result.saved} new articles.`, 5000);
+        loadStats();
+        loadArticles(1);
+      } else if (d.last_result && d.last_result.error) {
+        showToast(`❌ Pipeline error: ${d.last_result.error}`, 5000);
+      }
+    }
+  }, 3000);
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+
+(async function init() {
+  await loadStats();
+  await loadArticles(1);
+
+  // Check if pipeline is already running
+  const r = await fetch(`${API}/api/pipeline/status`);
+  const d = await r.json();
+  if (d.running) {
+    document.querySelector('.pipeline-btn').disabled = true;
+    $('pipeline-status-label').textContent = '⏳ Running…';
+    pollPipelineStatus();
+  }
+})();
+</script>
+</body>
+</html>
